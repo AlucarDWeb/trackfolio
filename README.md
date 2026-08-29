@@ -1,4 +1,4 @@
-# trackfolio
+# Trackfolio
 
 A terminal UI for tracking a personal book of US T-Bills and USD deposits: capital, weighted yield, and interest projections (day / week / month / year), with full CRUD over positions.
 

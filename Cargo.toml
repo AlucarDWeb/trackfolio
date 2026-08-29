@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 authors = ["AlucarDWeb"]
-description = "TUI Rust per un libro personale di T-Bill USA e depositi USD/EUR"
+description = "TUI for a personal book of US T-Bills and USD/EUR deposits"
 
 [dependencies]
 ratatui = "0.29"

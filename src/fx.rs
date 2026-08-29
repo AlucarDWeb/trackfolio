@@ -1,7 +1,10 @@
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 
 use rust_decimal::Decimal;
 use serde_json::Value;
+
+const EUR_USD_URL: &str = "https://api.frankfurter.dev/v1/latest?from=EUR&to=USD";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FxQuote {
@@ -9,9 +12,22 @@ pub struct FxQuote {
     pub date: String,
 }
 
+fn prefer_ipv4(mut addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    addrs.sort_by_key(|a| !a.is_ipv4());
+    addrs
+}
+
 pub fn eur_usd() -> Result<FxQuote, String> {
-    let response = ureq::get("https://api.frankfurter.app/latest?from=EUR&to=USD")
-        .timeout(Duration::from_secs(5))
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(15))
+        .resolver(|netloc: &str| {
+            netloc
+                .to_socket_addrs()
+                .map(|iter| prefer_ipv4(iter.collect()))
+        })
+        .build();
+    let response = agent
+        .get(EUR_USD_URL)
         .call()
         .map_err(|e| format!("FX request failed: {e}"))?;
     let body = response
@@ -62,6 +78,25 @@ mod tests {
         "date": "2026-08-28",
         "rates": { "USD": 1.0842 }
     }"#;
+
+    #[test]
+    fn prefer_ipv4_sorts_v4_before_v6() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+        let v6 = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 443);
+        let v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 443);
+        let out = prefer_ipv4(vec![v6, v4]);
+        assert!(out[0].is_ipv4());
+        assert!(out[1].is_ipv6());
+    }
+
+    #[test]
+    fn eur_usd_url_is_frankfurter_dev_v1() {
+        assert_eq!(
+            EUR_USD_URL,
+            "https://api.frankfurter.dev/v1/latest?from=EUR&to=USD"
+        );
+        assert!(!EUR_USD_URL.contains("frankfurter.app"));
+    }
 
     #[test]
     fn parses_fixture_rate_and_date() {

@@ -1,0 +1,25 @@
+[package]
+name = "trackfolio"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["AlucarDWeb"]
+description = "TUI Rust per un libro personale di T-Bill USA e depositi USD/EUR"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+ureq = { version = "2", features = ["json"] }
+ulid = { version = "1", features = ["serde"] }
+dirs = "5"
+chrono = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+strip = true

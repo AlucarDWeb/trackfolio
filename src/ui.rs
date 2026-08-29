@@ -511,12 +511,12 @@ fn kpi_bar(app: &App) -> Paragraph<'static> {
         spans.push(Span::styled(format!(" {name} "), label));
         spans.push(Span::styled(text, value));
     };
-    push("CAPITALE", fmt_money(totals.capital));
+    push("CAPITAL", fmt_money(totals.capital));
     push("YIELD", fmt_pct(totals.book_yield * Decimal::from(100)));
-    push("GIORNO", fmt_money(totals.day));
-    push("SETT", fmt_money(totals.week));
-    push("MESE", fmt_money(totals.month));
-    push("ANNO", fmt_money(totals.year));
+    push("DAY", fmt_money(totals.day));
+    push("WEEK", fmt_money(totals.week));
+    push("MONTH", fmt_money(totals.month));
+    push("YEAR", fmt_money(totals.year));
     Paragraph::new(Line::from(spans))
 }
 
@@ -573,13 +573,13 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
     ];
     let header = Row::new([
         "#",
-        "TIPO",
-        "NOME",
-        "NOMINALE",
+        "TYPE",
+        "NAME",
+        "PRINCIPAL",
         "YIELD",
-        "SCADENZA",
-        "GIORNO",
-        "ANNO",
+        "MATURITY",
+        "DAY",
+        "YEAR",
     ])
     .style(Style::default().add_modifier(Modifier::BOLD));
     let table = Table::new(rows, widths)

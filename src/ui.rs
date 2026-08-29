@@ -557,6 +557,8 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
             fmt_pct(p.yield_pct),
             fmt_date(p.maturity.as_deref()),
             fmt_money(r.day),
+            fmt_money(r.week),
+            fmt_money(r.month),
             fmt_money(r.year),
         ])
         .style(style)
@@ -569,6 +571,7 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
         Constraint::Length(8),
         Constraint::Length(12),
         Constraint::Length(11),
+        Constraint::Length(11),
         Constraint::Length(13),
     ];
     let header = Row::new([
@@ -579,6 +582,8 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
         "YIELD",
         "MATURITY",
         "DAY",
+        "WEEK",
+        "MONTH",
         "YEAR",
     ])
     .style(Style::default().add_modifier(Modifier::BOLD));

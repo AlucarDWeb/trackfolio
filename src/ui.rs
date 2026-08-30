@@ -112,7 +112,11 @@ impl OverlayState {
             currency: p.source_ccy.clone(),
             amount,
             yield_pct: p.yield_pct.to_string(),
-            maturity: p.maturity.clone().unwrap_or_default(),
+            maturity: if p.kind == Kind::Deposit {
+                p.start_date.clone().unwrap_or_default()
+            } else {
+                p.maturity.clone().unwrap_or_default()
+            },
             error: None,
         }
     }
@@ -186,7 +190,10 @@ pub fn validate_overlay(state: &OverlayState) -> Result<ParsedInput, String> {
         return Err("yield must be zero or greater".to_string());
     }
     if !state.maturity.is_empty() && !is_iso_date(&state.maturity) {
-        return Err("maturity must be YYYY-MM-DD".to_string());
+        return Err(format!(
+            "{} must be YYYY-MM-DD",
+            date_field_label(&state.kind)
+        ));
     }
     Ok(ParsedInput { amount, yield_pct })
 }
@@ -227,23 +234,41 @@ pub fn build_position(
             None,
         ),
     };
+    let date = if state.maturity.is_empty() {
+        None
+    } else {
+        Some(state.maturity.clone())
+    };
+    let (maturity, start_date) = if state.kind == Kind::Deposit {
+        (None, date)
+    } else {
+        (date, None)
+    };
     Ok(Position {
         id,
         kind: state.kind.clone(),
         name: state.name.trim().to_string(),
         principal_usd,
         yield_pct: input.yield_pct,
-        maturity: if state.maturity.is_empty() {
-            None
-        } else {
-            Some(state.maturity.clone())
-        },
-        start_date: None,
+        maturity,
+        start_date,
         source_ccy,
         source_amount,
         fx_rate,
         fx_date,
     })
+}
+
+pub fn display_principal(p: &Position, today: NaiveDate) -> Decimal {
+    calc::current_value(p, today)
+}
+
+fn row_date(p: &Position) -> Option<&str> {
+    if p.kind == Kind::Deposit {
+        p.start_date.as_deref()
+    } else {
+        p.maturity.as_deref()
+    }
 }
 
 pub struct App {
@@ -483,6 +508,13 @@ fn kind_label(kind: &Kind) -> &'static str {
     }
 }
 
+fn date_field_label(kind: &Kind) -> &'static str {
+    match kind {
+        Kind::Deposit => "start date",
+        Kind::Tbill | Kind::Other => "maturity",
+    }
+}
+
 pub fn draw(f: &mut Frame, app: &App) {
     let area = f.area();
     let chunks = ratatui::layout::Layout::vertical([
@@ -554,9 +586,9 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
             (i + 1).to_string(),
             kind_label(&p.kind).to_string(),
             p.name.clone(),
-            fmt_money(p.principal_usd),
+            fmt_money(display_principal(p, today)),
             fmt_pct(p.yield_pct),
-            fmt_date(p.maturity.as_deref()),
+            fmt_date(row_date(p)),
             fmt_money(r.day),
             fmt_money(r.week),
             fmt_money(r.month),
@@ -637,7 +669,7 @@ fn render_overlay(f: &mut Frame, app: &App, area: Rect) {
         ("amount", overlay.amount.clone(), Field::Amount),
         ("yield %", overlay.yield_pct.clone(), Field::Yield),
         (
-            "maturity",
+            date_field_label(&overlay.kind),
             if overlay.maturity.is_empty() {
                 "—".to_string()
             } else {
@@ -919,6 +951,83 @@ mod tests {
     }
 
     #[test]
+    fn build_position_deposit_writes_start_date_and_clears_maturity() {
+        let mut state = overlay("Deposit", "30000", "3.8", "2025-08-30");
+        state.kind = Kind::Deposit;
+        let p = build_position(&state, None, ulid::Ulid::new()).unwrap();
+        assert_eq!(p.start_date.as_deref(), Some("2025-08-30"));
+        assert_eq!(p.maturity, None);
+    }
+
+    #[test]
+    fn build_position_tbill_sets_maturity_and_start_date_is_none() {
+        let p = build_position(
+            &overlay("T-Bill", "50000", "5.12", "2026-09-26"),
+            None,
+            ulid::Ulid::new(),
+        )
+        .unwrap();
+        assert_eq!(p.maturity.as_deref(), Some("2026-09-26"));
+        assert_eq!(p.start_date, None);
+    }
+
+    #[test]
+    fn validation_deposit_date_error_names_start_date() {
+        let mut state = overlay("a", "100", "5", "garbage");
+        state.kind = Kind::Deposit;
+        assert_eq!(
+            validate_overlay(&state).unwrap_err(),
+            "start date must be YYYY-MM-DD"
+        );
+    }
+
+    #[test]
+    fn edit_overlay_on_deposit_restores_start_date() {
+        let p = Position {
+            id: ulid::Ulid::new(),
+            kind: Kind::Deposit,
+            name: "Deposit USD".to_string(),
+            principal_usd: dec("30000"),
+            yield_pct: dec("3.80"),
+            maturity: None,
+            start_date: Some("2025-08-30".to_string()),
+            source_ccy: "USD".to_string(),
+            source_amount: None,
+            fx_rate: None,
+            fx_date: None,
+        };
+        let state = OverlayState::from_position(0, &p);
+        assert_eq!(state.kind, Kind::Deposit);
+        assert_eq!(state.maturity, "2025-08-30");
+    }
+
+    #[test]
+    fn display_principal_grows_deposits_not_tbills() {
+        let today = NaiveDate::from_ymd_opt(2026, 8, 30).unwrap();
+        let start = (today - chrono::Duration::days(365)).to_string();
+        let mut dep = usd_position("dep", "30000", "3.8");
+        dep.kind = Kind::Deposit;
+        dep.start_date = Some(start.clone());
+        assert!(display_principal(&dep, today) > dec("30000"));
+        let mut tb = usd_position("tb", "30000", "3.8");
+        tb.start_date = Some(start);
+        assert_eq!(display_principal(&tb, today), dec("30000"));
+    }
+
+    #[test]
+    fn row_date_shows_start_date_for_deposits_and_maturity_otherwise() {
+        let mut dep = usd_position("dep", "30000", "3.8");
+        dep.kind = Kind::Deposit;
+        dep.start_date = Some("2025-08-30".to_string());
+        dep.maturity = Some("2026-12-31".to_string());
+        assert_eq!(row_date(&dep), Some("2025-08-30"));
+        let mut tb = usd_position("tb", "30000", "3.8");
+        tb.start_date = Some("2025-08-30".to_string());
+        tb.maturity = Some("2026-12-31".to_string());
+        assert_eq!(row_date(&tb), Some("2026-12-31"));
+    }
+
+    #[test]
     fn build_position_eur_uses_quote_and_keeps_source_amount() {
         let quote = FxQuote {
             rate: dec("1.085"),
@@ -1047,6 +1156,8 @@ mod tests {
         assert_eq!(p.principal_usd, dec("50000"));
         assert_eq!(p.yield_pct, dec("5.12"));
         assert_eq!(p.source_ccy, "USD");
+        assert_eq!(p.start_date, None);
+        assert_eq!(p.maturity, None);
         assert!(app.dirty);
     }
 

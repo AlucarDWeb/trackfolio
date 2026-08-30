@@ -65,6 +65,7 @@ mod tests {
             principal_usd: Decimal::from_str(principal).unwrap(),
             yield_pct: Decimal::from_str(yield_pct).unwrap(),
             maturity: None,
+            start_date: None,
             source_ccy: "USD".to_string(),
             source_amount: None,
             fx_rate: None,

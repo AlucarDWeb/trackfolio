@@ -238,6 +238,7 @@ pub fn build_position(
         } else {
             Some(state.maturity.clone())
         },
+        start_date: None,
         source_ccy,
         source_amount,
         fx_rate,
@@ -708,6 +709,7 @@ mod tests {
             principal_usd: dec(principal),
             yield_pct: dec(yield_pct),
             maturity: None,
+            start_date: None,
             source_ccy: "USD".to_string(),
             source_amount: None,
             fx_rate: None,
@@ -949,6 +951,7 @@ mod tests {
             principal_usd: dec("48825"),
             yield_pct: dec("3.10"),
             maturity: None,
+            start_date: None,
             source_ccy: "EUR".to_string(),
             source_amount: Some(dec("45000")),
             fx_rate: Some(dec("1.085")),

@@ -68,6 +68,7 @@ mod tests {
             principal_usd: Decimal::from_str_exact(principal).unwrap(),
             yield_pct: Decimal::from_str_exact(yield_pct).unwrap(),
             maturity: Some("2026-09-26".to_string()),
+            start_date: None,
             source_ccy: "USD".to_string(),
             source_amount: None,
             fx_rate: None,

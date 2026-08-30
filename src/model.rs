@@ -41,6 +41,36 @@ mod tests {
     }
 
     #[test]
+    fn legacy_fixture_deserializes_without_start_date() {
+        let p: Position = serde_json::from_str(FIXTURE).unwrap();
+        assert_eq!(p.start_date, None);
+    }
+
+    #[test]
+    fn start_date_roundtrips() {
+        let json = FIXTURE.replace(
+            "\"source_ccy\": \"USD\"",
+            "\"source_ccy\": \"USD\",\n        \"start_date\": \"2025-08-30\"",
+        );
+        let p: Position = serde_json::from_str(&json).unwrap();
+        assert_eq!(p.start_date.as_deref(), Some("2025-08-30"));
+        let book = book_with(p);
+        let back: Book =
+            serde_json::from_str(&serde_json::to_string(&book).unwrap()).unwrap();
+        assert_eq!(back, book);
+    }
+
+    #[test]
+    fn null_start_date_deserializes_to_none() {
+        let json = FIXTURE.replace(
+            "\"source_ccy\": \"USD\"",
+            "\"source_ccy\": \"USD\",\n        \"start_date\": null",
+        );
+        let p: Position = serde_json::from_str(&json).unwrap();
+        assert_eq!(p.start_date, None);
+    }
+
+    #[test]
     fn book_roundtrip_is_identical() {
         let p: Position = serde_json::from_str(FIXTURE).unwrap();
         let book = book_with(p);
@@ -106,6 +136,8 @@ pub struct Position {
     #[serde(with = "rust_decimal::serde::str")]
     pub yield_pct: rust_decimal::Decimal,
     pub maturity: Option<String>,
+    #[serde(default)]
+    pub start_date: Option<String>,
     pub source_ccy: String,
     #[serde(with = "rust_decimal::serde::str_option")]
     pub source_amount: Option<rust_decimal::Decimal>,

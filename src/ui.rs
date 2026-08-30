@@ -504,7 +504,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 }
 
 fn kpi_bar(app: &App) -> Paragraph<'static> {
-    let totals = calc::book(&app.book.positions);
+    let totals = calc::book(&app.book.positions, chrono::Local::now().date_naive());
     let label = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
     let value = Style::default().add_modifier(Modifier::BOLD);
     let mut spans = Vec::new();
@@ -538,7 +538,7 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
     }
     let today = chrono::Local::now().date_naive();
     let rows = app.book.positions.iter().enumerate().map(|(i, p)| {
-        let r = calc::row(p);
+        let r = calc::row(p, chrono::Local::now().date_naive());
         let expired = p
             .maturity
             .as_deref()

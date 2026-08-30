@@ -558,6 +558,27 @@ fn separator(width: u16) -> Paragraph<'static> {
         .style(Style::default().fg(Color::DarkGray))
 }
 
+fn book_headers() -> [&'static str; 10] {
+    [
+        "#", "TYPE", "NAME", "PRINCIPAL", "YIELD", "MATURITY", "DAY", "WEEK", "MONTH", "YEAR",
+    ]
+}
+
+fn book_column_widths() -> [Constraint; 10] {
+    [
+        Constraint::Length(4),
+        Constraint::Length(9),
+        Constraint::Min(16),
+        Constraint::Length(14),
+        Constraint::Length(8),
+        Constraint::Length(12),
+        Constraint::Length(11),
+        Constraint::Length(11),
+        Constraint::Length(13),
+        Constraint::Length(13),
+    ]
+}
+
 fn render_book(f: &mut Frame, app: &App, area: Rect) {
     if app.book.positions.is_empty() {
         f.render_widget(
@@ -596,31 +617,9 @@ fn render_book(f: &mut Frame, app: &App, area: Rect) {
         ])
         .style(style)
     });
-    let widths = [
-        Constraint::Length(4),
-        Constraint::Length(9),
-        Constraint::Min(16),
-        Constraint::Length(14),
-        Constraint::Length(8),
-        Constraint::Length(12),
-        Constraint::Length(11),
-        Constraint::Length(11),
-        Constraint::Length(13),
-    ];
-    let header = Row::new([
-        "#",
-        "TYPE",
-        "NAME",
-        "PRINCIPAL",
-        "YIELD",
-        "MATURITY",
-        "DAY",
-        "WEEK",
-        "MONTH",
-        "YEAR",
-    ])
-    .style(Style::default().add_modifier(Modifier::BOLD));
-    let table = Table::new(rows, widths)
+    let header = Row::new(book_headers().map(str::to_string))
+        .style(Style::default().add_modifier(Modifier::BOLD));
+    let table = Table::new(rows, book_column_widths())
         .header(header)
         .block(Block::default().borders(Borders::NONE))
         .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
@@ -780,6 +779,14 @@ mod tests {
     fn fmt_date_dash_for_none() {
         assert_eq!(fmt_date(None), "—");
         assert_eq!(fmt_date(Some("2026-09-26")), "2026-09-26");
+    }
+
+    #[test]
+    fn book_table_assigns_a_width_to_the_year_column() {
+        let headers = super::book_headers();
+        let widths = super::book_column_widths();
+        assert_eq!(headers.len(), widths.len());
+        assert_eq!(headers.last().copied(), Some("YEAR"));
     }
 
     #[test]

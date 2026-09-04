@@ -22,6 +22,10 @@ fn main() {
         }
     };
     let mut app = App::new(book);
+    match trackfolio::fx::eur_board() {
+        Ok(board) => app.fx_board = Some(board),
+        Err(_) => app.message = Some("FX unavailable".to_string()),
+    }
 
     let mut terminal = match setup_terminal() {
         Ok(terminal) => terminal,

@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Row, Table, TableState};
 use rust_decimal::{Decimal, RoundingStrategy};
 
-use crate::fx::{FxQuote, eur_to_usd};
+use crate::fx::{FxBoard, FxQuote, eur_to_usd};
 use crate::model::{Book, Kind, Position};
 use crate::{calc, fx};
 
@@ -26,6 +26,44 @@ pub fn fmt_pct(d: Decimal) -> String {
 
 pub fn fmt_date(d: Option<&str>) -> String {
     d.unwrap_or("—").to_string()
+}
+
+pub fn fmt_fx_pct(d: Decimal) -> String {
+    let rounded = d.round_dp_with_strategy(1, RoundingStrategy::MidpointAwayFromZero);
+    let neg = rounded < Decimal::ZERO;
+    let abs = if neg { -rounded } else { rounded };
+    let (int_part, frac) = match abs.to_string().split_once('.') {
+        Some((i, f)) => (i.to_string(), f.to_string()),
+        None => (abs.to_string(), "0".to_string()),
+    };
+    format!("{}{}.{frac}%", if neg { "-" } else { "+" }, int_part)
+}
+
+fn fx_rate_text(rate: Option<Decimal>, pct: Option<Decimal>) -> String {
+    let Some(rate) = rate else {
+        return "—".to_string();
+    };
+    match pct {
+        Some(p) => format!("{rate} {}", fmt_fx_pct(p)),
+        None => rate.to_string(),
+    }
+}
+
+pub fn fx_board_text(board: Option<&FxBoard>) -> String {
+    match board {
+        None => " EURUSD —    EURYEN —".to_string(),
+        Some(b) => {
+            let mut line = format!(
+                " EURUSD {}    EURYEN {}",
+                fx_rate_text(b.usd, b.usd_pct),
+                fx_rate_text(b.jpy, b.jpy_pct)
+            );
+            if let Some(date) = &b.date {
+                line.push_str(&format!("    {date}"));
+            }
+            line
+        }
+    }
 }
 
 fn fmt_decimal_2dp(d: Decimal) -> String {
@@ -276,6 +314,7 @@ pub struct App {
     pub selected: Option<usize>,
     pub overlay: Option<OverlayState>,
     pub message: Option<String>,
+    pub fx_board: Option<FxBoard>,
     pub dirty: bool,
     delete_armed: bool,
 }
@@ -292,6 +331,7 @@ impl App {
             selected,
             overlay: None,
             message: None,
+            fx_board: None,
             dirty: false,
             delete_armed: false,
         }
@@ -518,21 +558,74 @@ fn date_field_label(kind: &Kind) -> &'static str {
 pub fn draw(f: &mut Frame, app: &App) {
     let area = f.area();
     let chunks = ratatui::layout::Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Min(1),
-        Constraint::Length(1),
+        Constraint::Length(1), // fx
+        Constraint::Length(1), // kpi
+        Constraint::Length(1), // separator
+        Constraint::Min(1),    // book
+        Constraint::Length(1), // footer
     ])
     .split(area);
 
-    f.render_widget(kpi_bar(app), chunks[0]);
-    f.render_widget(separator(chunks[1].width), chunks[1]);
-    render_book(f, app, chunks[2]);
-    f.render_widget(footer(app), chunks[3]);
+    f.render_widget(fx_bar(app.fx_board.as_ref()), chunks[0]);
+    f.render_widget(kpi_bar(app), chunks[1]);
+    f.render_widget(separator(chunks[2].width), chunks[2]);
+    render_book(f, app, chunks[3]);
+    f.render_widget(footer(app), chunks[4]);
 
     if app.overlay.is_some() {
         render_overlay(f, app, area);
     }
+}
+
+fn pct_style(p: Decimal) -> Style {
+    let rounded = p.round_dp_with_strategy(1, RoundingStrategy::MidpointAwayFromZero);
+    if rounded > Decimal::ZERO {
+        Style::default().fg(Color::Green)
+    } else if rounded < Decimal::ZERO {
+        Style::default().fg(Color::Red)
+    } else {
+        Style::default().add_modifier(Modifier::BOLD)
+    }
+}
+
+fn fx_spans(prefix: &str, name: &str, rate: Option<Decimal>, pct: Option<Decimal>) -> Vec<Span<'static>> {
+    let label = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let value = Style::default().add_modifier(Modifier::BOLD);
+    let mut spans = vec![
+        Span::styled(format!("{prefix}{name} "), label),
+        Span::styled(
+            rate.map(|d| d.to_string()).unwrap_or_else(|| "—".into()),
+            value,
+        ),
+    ];
+    if let Some(p) = pct {
+        spans.push(Span::styled(format!(" {}", fmt_fx_pct(p)), pct_style(p)));
+    }
+    spans
+}
+
+fn fx_bar(board: Option<&FxBoard>) -> Paragraph<'static> {
+    let (usd, usd_pct, jpy, jpy_pct, date): (
+        Option<Decimal>,
+        Option<Decimal>,
+        Option<Decimal>,
+        Option<Decimal>,
+        Option<String>,
+    ) = match board {
+        None => (None, None, None, None, None),
+        Some(b) => (b.usd, b.usd_pct, b.jpy, b.jpy_pct, b.date.clone()),
+    };
+    let mut spans = fx_spans(" ", "EURUSD", usd, usd_pct);
+    spans.push(Span::raw("    "));
+    spans.extend(fx_spans("", "EURYEN", jpy, jpy_pct));
+    if let Some(date) = date {
+        spans.push(Span::raw("    "));
+        spans.push(Span::styled(
+            date,
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+    }
+    Paragraph::new(Line::from(spans))
 }
 
 fn kpi_bar(app: &App) -> Paragraph<'static> {
@@ -746,6 +839,64 @@ mod tests {
             fx_rate: None,
             fx_date: None,
         }
+    }
+
+    #[test]
+    fn fx_board_text_none_is_dashes_without_date() {
+        assert_eq!(fx_board_text(None), " EURUSD —    EURYEN —");
+    }
+
+    #[test]
+    fn fmt_fx_pct_one_decimal_with_sign() {
+        assert_eq!(fmt_fx_pct(dec("0.3195")), "+0.3%");
+        assert_eq!(fmt_fx_pct(dec("-1.931")), "-1.9%");
+        assert_eq!(fmt_fx_pct(dec("0")), "+0.0%");
+        assert_eq!(fmt_fx_pct(dec("1.25")), "+1.3%");
+    }
+
+    #[test]
+    fn fx_board_text_full() {
+        let b = FxBoard {
+            usd: Some(dec("1.0842")),
+            jpy: Some(dec("157.32")),
+            usd_pct: None,
+            jpy_pct: None,
+            date: Some("2026-08-28".into()),
+        };
+        assert_eq!(
+            fx_board_text(Some(&b)),
+            " EURUSD 1.0842    EURYEN 157.32    2026-08-28"
+        );
+    }
+
+    #[test]
+    fn fx_board_text_appends_daily_pct_when_present() {
+        let b = FxBoard {
+            usd: Some(dec("1.1615")),
+            jpy: Some(dec("181.21")),
+            usd_pct: Some(dec("0.3195")),
+            jpy_pct: Some(dec("-1.931")),
+            date: Some("2026-09-03".into()),
+        };
+        assert_eq!(
+            fx_board_text(Some(&b)),
+            " EURUSD 1.1615 +0.3%    EURYEN 181.21 -1.9%    2026-09-03"
+        );
+    }
+
+    #[test]
+    fn fx_board_text_missing_usd_keeps_jpy_and_date() {
+        let b = FxBoard {
+            usd: None,
+            jpy: Some(dec("157.32")),
+            usd_pct: None,
+            jpy_pct: None,
+            date: Some("2026-08-28".into()),
+        };
+        assert_eq!(
+            fx_board_text(Some(&b)),
+            " EURUSD —    EURYEN 157.32    2026-08-28"
+        );
     }
 
     #[test]

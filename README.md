@@ -34,6 +34,8 @@ The portfolio is stored as a single JSON file at `~/.local/share/trackfolio/port
 
 Money and yields are stored as decimal strings and computed with exact decimal arithmetic. EUR positions are converted to USD once via the [Frankfurter](https://frankfurter.dev) API at entry time; the FX rate and date are persisted with the position.
 
+On start the TUI fetches EUR/USD and EUR/JPY once from Frankfurter and shows them above the KPIs as EURUSD and EURYEN, each with its daily percentage change versus the previous BCE close (e.g. `+0.3%`, green up, red down). A failed fetch still opens the book.
+
 ## Interest compounding
 
 **Deposits** grow with daily compounding: `value = principal × (1 + yield_pct/100 / 365)^n`, where `n` is the number of whole days from the position's start date to today. The start date is optional; if it is missing, the value stays at the entered nominal, so 0.1.0 files open unchanged.

@@ -185,6 +185,7 @@ Panel {
       root.lastError = err
       if (mode === "apply" && root.formOpen) root.formError = err
       else root.message = err
+      if (mode === "fx") root.scheduleFxRetry()
       return
     }
     root.lastError = ""
@@ -194,7 +195,10 @@ Panel {
     root.barYield = snap.barYield || root.barYield
     if (mode === "fx") {
       root.fx = snap.fx
-      if (root.deleteArmed < 0) root.message = snap.message || ""
+      var fxError = snap.fx && snap.fx.error ? String(snap.fx.error) : ""
+      if (root.deleteArmed < 0) root.message = fxError || snap.message || ""
+      if (fxError !== "") root.scheduleFxRetry()
+      else root.clearFxRetry()
     } else if (mode === "apply") {
       root.message = snap.message || ""
       root.formError = ""
@@ -210,6 +214,18 @@ Panel {
     } else if (root.selected >= root.positions.length) {
       root.selected = root.positions.length - 1
     }
+  }
+
+  property int fxFailures: 0
+
+  function scheduleFxRetry() {
+    root.fxFailures += 1
+    if (root.fxFailures <= 15) fxRetry.restart()
+  }
+
+  function clearFxRetry() {
+    root.fxFailures = 0
+    fxRetry.stop()
   }
 
   function finishJob(exitCode) {
@@ -345,11 +361,22 @@ Panel {
 
   Timer {
     // Hourly contract. The first read is onBinaryChanged, so this does not
-    // also fire at startup.
+    // also fire at startup. A failed read retries on fxRetry instead of
+    // waiting the full hour.
     interval: 60 * 60 * 1000
     repeat: true
     running: root.binary !== ""
     triggeredOnStart: false
+    onTriggered: {
+      root.fxFailures = 0
+      root.refreshFx()
+    }
+  }
+
+  Timer {
+    id: fxRetry
+    interval: 20000
+    repeat: false
     onTriggered: root.refreshFx()
   }
 

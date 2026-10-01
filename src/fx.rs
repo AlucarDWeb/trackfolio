@@ -19,7 +19,7 @@ fn prefer_ipv4(mut addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
 
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(5))
         .resolver(|netloc: &str| {
             netloc
                 .to_socket_addrs()
@@ -28,14 +28,35 @@ fn agent() -> ureq::Agent {
         .build()
 }
 
-fn fetch(url: &str) -> Result<String, String> {
+fn fetch_once(url: &str) -> Result<String, String> {
     let response = agent()
         .get(url)
+        .set("User-Agent", "trackfolio")
+        .set("Accept", "application/json")
         .call()
         .map_err(|e| format!("FX request failed: {e}"))?;
     response
         .into_string()
         .map_err(|e| format!("FX request failed: could not read body: {e}"))
+}
+
+fn fetch(url: &str) -> Result<String, String> {
+    // Frankfurter's edge sometimes accepts the TCP connection and then never
+    // sends a status line. One stall is not an outage; try again before the
+    // bar is stuck on "FX unavailable" until the next hour.
+    let mut last = String::new();
+    for attempt in 0..3 {
+        match fetch_once(url) {
+            Ok(body) => return Ok(body),
+            Err(error) => {
+                last = error;
+                if attempt + 1 < 3 {
+                    std::thread::sleep(Duration::from_millis(250));
+                }
+            }
+        }
+    }
+    Err(last)
 }
 
 pub fn eur_usd() -> Result<FxQuote, String> {

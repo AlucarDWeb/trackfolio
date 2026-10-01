@@ -84,12 +84,10 @@ pub fn show(path: &Path, fetch_fx: bool) -> Result<Value, String> {
     }
     match fx::eur_board() {
         Ok(board) => Ok(snapshot(&book, Some(Ok(&board)), None, today)),
-        Err(error) => Ok(snapshot(
-            &book,
-            Some(Err(error.as_str())),
-            Some("FX unavailable"),
-            today,
-        )),
+        Err(error) => {
+            let message = format!("FX unavailable: {error}");
+            Ok(snapshot(&book, Some(Err(error.as_str())), Some(&message), today))
+        }
     }
 }
 

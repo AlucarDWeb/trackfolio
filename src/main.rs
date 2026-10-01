@@ -52,7 +52,7 @@ fn tui_main() {
     let mut app = App::new(book);
     match trackfolio::fx::eur_board() {
         Ok(board) => app.fx_board = Some(board),
-        Err(_) => app.message = Some("FX unavailable".to_string()),
+        Err(error) => app.message = Some(format!("FX unavailable: {error}")),
     }
 
     let mut terminal = match setup_terminal() {

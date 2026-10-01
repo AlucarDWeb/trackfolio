@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.alucardweb.trackfolio",
+  "name": "Trackfolio",
+  "version": "0.1.4",
+  "author": "AlucarDWeb",
+  "license": "MIT",
+  "description": "Status-bar book of US T-Bills and USD/EUR deposits: capital, yield, interest, and CRUD. Needs the trackfolio binary as well as this plugin: cargo install --git https://github.com/AlucarDWeb/trackfolio",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Trackfolio",
+    "description": "Capital and yield pill with the full book panel. This is the display frontend only — install the binary with cargo install --git https://github.com/AlucarDWeb/trackfolio.",
+    "category": "Finance",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

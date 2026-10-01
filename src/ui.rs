@@ -540,7 +540,7 @@ fn overlay_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-fn kind_label(kind: &Kind) -> &'static str {
+pub fn kind_label(kind: &Kind) -> &'static str {
     match kind {
         Kind::Tbill => "T-Bill",
         Kind::Deposit => "Deposit",
@@ -577,14 +577,22 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
 }
 
-fn pct_style(p: Decimal) -> Style {
-    let rounded = p.round_dp_with_strategy(1, RoundingStrategy::MidpointAwayFromZero);
+pub fn fx_trend(d: Decimal) -> &'static str {
+    let rounded = d.round_dp_with_strategy(1, RoundingStrategy::MidpointAwayFromZero);
     if rounded > Decimal::ZERO {
-        Style::default().fg(Color::Green)
+        "up"
     } else if rounded < Decimal::ZERO {
-        Style::default().fg(Color::Red)
+        "down"
     } else {
-        Style::default().add_modifier(Modifier::BOLD)
+        "flat"
+    }
+}
+
+fn pct_style(p: Decimal) -> Style {
+    match fx_trend(p) {
+        "up" => Style::default().fg(Color::Green),
+        "down" => Style::default().fg(Color::Red),
+        _ => Style::default().add_modifier(Modifier::BOLD),
     }
 }
 

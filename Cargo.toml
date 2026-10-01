@@ -1,10 +1,10 @@
 [package]
 name = "trackfolio"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 license = "MIT"
 authors = ["AlucarDWeb"]
-description = "TUI for a personal book of US T-Bills and USD/EUR deposits"
+description = "TUI and Omarchy bar plugin for a personal book of US T-Bills and USD/EUR deposits"
 
 [dependencies]
 ratatui = "0.29"

@@ -6,10 +6,38 @@ use std::time::Duration;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
+use serde_json::json;
+
 use trackfolio::store;
 use trackfolio::ui::{self, App};
 
 fn main() {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        None => tui_main(),
+        Some("json") => std::process::exit(json_main(args)),
+        Some(other) => {
+            eprintln!("trackfolio: unknown command '{other}'");
+            eprintln!("usage: trackfolio [json show [--fx] | json apply <json>]");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn json_main(args: impl Iterator<Item = String>) -> i32 {
+    match trackfolio::query::run(args) {
+        Ok(value) => {
+            println!("{value}");
+            0
+        }
+        Err(message) => {
+            println!("{}", json!({"ok": false, "error": message}));
+            1
+        }
+    }
+}
+
+fn tui_main() {
     let Some(path) = store::data_path() else {
         eprintln!("trackfolio: unable to determine data path");
         std::process::exit(1);
